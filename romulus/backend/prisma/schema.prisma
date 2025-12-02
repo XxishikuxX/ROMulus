@@ -1,0 +1,577 @@
+// EmuVerse Database Schema
+// Prisma ORM with PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User Management
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  username      String    @unique
+  passwordHash  String
+  avatar        String?
+  role          UserRole  @default(USER)
+  isActive      Boolean   @default(true)
+  isBanned      Boolean   @default(false)
+  banReason     String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  lastLoginAt   DateTime?
+  lastActiveAt  DateTime?
+
+  // RetroAchievements Integration
+  raUsername    String?
+  raApiKey      String?
+  raUserId      String?
+  raLinkedAt    DateTime?
+
+  // Preferences
+  preferences   UserPreferences?
+  
+  // Relations
+  sessions      GameSession[]
+  saves         SaveState[]
+  uploads       Rom[]           @relation("UploadedBy")
+  library       UserLibrary[]
+  playtime      PlayTime[]
+  achievements  UserAchievement[]
+  
+  // Social
+  friendsAdded    Friendship[] @relation("FriendAdder")
+  friendsReceived Friendship[] @relation("FriendReceiver")
+  lobbiesCreated  Lobby[]      @relation("LobbyHost")
+  lobbyMembers    LobbyMember[]
+  messages        Message[]
+  notifications   Notification[]
+
+  // New Feature Relations
+  raAchievements      UserRAchievement[]
+  cloudSaves          CloudSave[]
+  syncEvents          SyncEvent[]
+  shaderConfigs       UserShaderConfig[]
+  emulatorSettings    UserEmulatorSettings[]
+  netplaySessions     NetplaySession[]
+  createdCheats       CheatCode[]       @relation("CheatCreator")
+  favoriteCheats      UserFavoriteCheat[]
+
+  @@index([email])
+  @@index([username])
+}
+
+enum UserRole {
+  USER
+  MODERATOR
+  ADMIN
+}
+
+model UserPreferences {
+  id                String   @id @default(uuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // UI Preferences
+  theme             String   @default("dark")
+  accentColor       String   @default("#6366f1")
+  sidebarCollapsed  Boolean  @default(false)
+  gridSize          String   @default("medium")
+  showBoxArt        Boolean  @default(true)
+  
+  // Controller Settings (JSON)
+  controllerConfig  Json?
+  
+  // Notification Settings
+  emailNotifications    Boolean @default(true)
+  friendNotifications   Boolean @default(true)
+  achievementNotifications Boolean @default(true)
+  
+  // Streaming Settings
+  preferredQuality  String   @default("1080p")
+  lowLatencyMode    Boolean  @default(true)
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+// ROM Management
+model Rom {
+  id            String      @id @default(uuid())
+  title         String
+  filename      String
+  filepath      String
+  filesize      BigInt
+  checksum      String?
+  system        GameSystem
+  region        String?
+  isPublic      Boolean     @default(true)
+  isVerified    Boolean     @default(false)
+  
+  // Metadata
+  description   String?     @db.Text
+  releaseDate   String?
+  developer     String?
+  publisher     String?
+  genre         String?
+  players       String?
+  rating        Float?
+  
+  // Media
+  coverArt      String?
+  screenshots   String[]
+  
+  // Scraping info
+  scrapedAt     DateTime?
+  
+  // Relations
+  uploadedById  String?
+  uploadedBy    User?       @relation("UploadedBy", fields: [uploadedById], references: [id])
+  
+  sessions      GameSession[]
+  saves         SaveState[]
+  userLibraries UserLibrary[]
+  playtime      PlayTime[]
+  
+  // New relations
+  netplaySessions NetplaySession[]
+  cheats          CheatCode[]
+  
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([system])
+  @@index([title])
+  @@index([checksum])
+}
+
+enum GameSystem {
+  // PlayStation
+  PS3
+  PS2
+  PS1
+  PSP
+  VITA
+  
+  // Xbox
+  XBOX
+  XBOX360
+  
+  // Nintendo Home
+  WIIU
+  WII
+  GAMECUBE
+  N64
+  SNES
+  NES
+  
+  // Nintendo Handheld
+  N3DS
+  NDS
+  GBA
+  GBC
+  GB
+  
+  // Sega
+  DREAMCAST
+  SATURN
+  GENESIS
+  SEGACD
+  S32X
+  SMS
+  GAMEGEAR
+}
+
+model UserLibrary {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  romId       String
+  rom         Rom      @relation(fields: [romId], references: [id], onDelete: Cascade)
+  
+  isFavorite  Boolean  @default(false)
+  isHidden    Boolean  @default(false)
+  lastPlayed  DateTime?
+  playCount   Int      @default(0)
+  
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, romId])
+  @@index([userId])
+}
+
+// Game Sessions
+model GameSession {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  romId       String
+  rom         Rom      @relation(fields: [romId], references: [id], onDelete: Cascade)
+  
+  startedAt   DateTime @default(now())
+  endedAt     DateTime?
+  duration    Int?     // in seconds
+  
+  // Streaming info
+  quality     String?
+  peakBitrate Int?
+  
+  // Session state
+  isActive    Boolean  @default(true)
+  processId   Int?
+
+  @@index([userId])
+  @@index([romId])
+  @@index([isActive])
+}
+
+// Save States
+model SaveState {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  romId       String
+  rom         Rom      @relation(fields: [romId], references: [id], onDelete: Cascade)
+  
+  slot        Int
+  filename    String
+  filepath    String
+  screenshot  String?
+  
+  isAutoSave  Boolean  @default(false)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, romId, slot])
+  @@index([userId, romId])
+}
+
+// Play Time Statistics
+model PlayTime {
+  id          String     @id @default(uuid())
+  userId      String
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  romId       String
+  rom         Rom        @relation(fields: [romId], references: [id], onDelete: Cascade)
+  
+  date        DateTime   @db.Date
+  minutes     Int        @default(0)
+  
+  @@unique([userId, romId, date])
+  @@index([userId])
+  @@index([date])
+}
+
+// Achievements
+model Achievement {
+  id            String   @id @default(uuid())
+  name          String
+  description   String
+  icon          String?
+  points        Int      @default(10)
+  
+  // Criteria (JSON)
+  criteria      Json
+  
+  isSecret      Boolean  @default(false)
+  
+  users         UserAchievement[]
+  
+  createdAt     DateTime @default(now())
+}
+
+model UserAchievement {
+  id            String      @id @default(uuid())
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievementId String
+  achievement   Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+  
+  unlockedAt    DateTime    @default(now())
+
+  @@unique([userId, achievementId])
+}
+
+// Social Features
+model Friendship {
+  id          String           @id @default(uuid())
+  adderId     String
+  adder       User             @relation("FriendAdder", fields: [adderId], references: [id], onDelete: Cascade)
+  receiverId  String
+  receiver    User             @relation("FriendReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  
+  status      FriendshipStatus @default(PENDING)
+  
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@unique([adderId, receiverId])
+  @@index([receiverId])
+}
+
+enum FriendshipStatus {
+  PENDING
+  ACCEPTED
+  BLOCKED
+}
+
+// Multiplayer Lobbies
+model Lobby {
+  id          String        @id @default(uuid())
+  name        String
+  hostId      String
+  host        User          @relation("LobbyHost", fields: [hostId], references: [id], onDelete: Cascade)
+  romId       String?
+  
+  maxPlayers  Int           @default(4)
+  isPrivate   Boolean       @default(false)
+  password    String?
+  
+  status      LobbyStatus   @default(WAITING)
+  
+  members     LobbyMember[]
+  messages    Message[]
+  
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([status])
+}
+
+enum LobbyStatus {
+  WAITING
+  STARTING
+  INGAME
+  CLOSED
+}
+
+model LobbyMember {
+  id        String   @id @default(uuid())
+  lobbyId   String
+  lobby     Lobby    @relation(fields: [lobbyId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  isReady   Boolean  @default(false)
+  joinedAt  DateTime @default(now())
+
+  @@unique([lobbyId, userId])
+}
+
+model Message {
+  id        String   @id @default(uuid())
+  lobbyId   String
+  lobby     Lobby    @relation(fields: [lobbyId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  content   String
+  
+  createdAt DateTime @default(now())
+
+  @@index([lobbyId])
+}
+
+// Notifications
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  type      NotificationType
+  title     String
+  message   String
+  data      Json?
+  
+  isRead    Boolean          @default(false)
+  
+  createdAt DateTime         @default(now())
+
+  @@index([userId, isRead])
+}
+
+enum NotificationType {
+  FRIEND_REQUEST
+  FRIEND_ACCEPTED
+  LOBBY_INVITE
+  ACHIEVEMENT
+  SYSTEM
+}
+
+// System Configuration
+model SystemConfig {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     Json
+  
+  updatedAt DateTime @updatedAt
+}
+
+// Audit Log
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  action    String
+  entity    String
+  entityId  String?
+  details   Json?
+  ipAddress String?
+  
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+// ==================== NEW FEATURES ====================
+
+// RetroAchievements Integration
+model UserRAchievement {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievementId String
+  hardcore      Boolean  @default(false)
+  earnedAt      DateTime @default(now())
+
+  @@unique([userId, achievementId, hardcore])
+  @@index([userId])
+}
+
+// Cloud Save Sync
+model CloudSave {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  relativePath String
+  type         String   // 'save' or 'state'
+  hash         String
+  size         Int
+  modifiedAt   DateTime
+  gameId       String?
+  system       String?
+  slot         Int?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  versions     CloudSaveVersion[]
+
+  @@unique([userId, relativePath])
+  @@index([userId])
+  @@index([gameId])
+}
+
+model CloudSaveVersion {
+  id          String    @id @default(cuid())
+  cloudSaveId String
+  cloudSave   CloudSave @relation(fields: [cloudSaveId], references: [id], onDelete: Cascade)
+  hash        String
+  size        Int
+  data        Bytes?
+  createdAt   DateTime  @default(now())
+
+  @@index([cloudSaveId])
+}
+
+model SyncEvent {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceId        String
+  filesUploaded   Int      @default(0)
+  filesDownloaded Int      @default(0)
+  conflicts       Int      @default(0)
+  createdAt       DateTime @default(now())
+
+  @@index([userId])
+}
+
+// User Shader Configurations
+model UserShaderConfig {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  presetId  String
+  system    String?
+  settings  Json     @default("{}")
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([system])
+}
+
+// User Emulator Settings (run-ahead, rewind, etc.)
+model UserEmulatorSettings {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  system    String   // 'global' or specific system
+  settings  Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, system])
+  @@index([userId])
+}
+
+// Netplay Sessions
+model NetplaySession {
+  id         String    @id
+  hostId     String
+  host       User      @relation(fields: [hostId], references: [id])
+  romId      String
+  rom        Rom       @relation(fields: [romId], references: [id])
+  mode       String
+  maxPlayers Int
+  settings   Json
+  status     String
+  createdAt  DateTime  @default(now())
+  endedAt    DateTime?
+
+  @@index([hostId])
+  @@index([status])
+}
+
+// Cheat Codes Database
+model CheatCode {
+  id          String   @id @default(cuid())
+  romId       String?
+  rom         Rom?     @relation(fields: [romId], references: [id])
+  gameTitle   String
+  system      String
+  name        String
+  description String?
+  code        String   @db.Text
+  format      String   @default("Raw")
+  category    String?
+  isCustom    Boolean  @default(false)
+  isVerified  Boolean  @default(false)
+  createdBy   String?
+  creator     User?    @relation("CheatCreator", fields: [createdBy], references: [id])
+  createdAt   DateTime @default(now())
+  favorites   UserFavoriteCheat[]
+
+  @@index([romId])
+  @@index([system])
+  @@index([gameTitle])
+}
+
+model UserFavoriteCheat {
+  id      String    @id @default(cuid())
+  userId  String
+  user    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cheatId String
+  cheat   CheatCode @relation(fields: [cheatId], references: [id], onDelete: Cascade)
+  addedAt DateTime  @default(now())
+
+  @@unique([userId, cheatId])
+  @@index([userId])
+}
