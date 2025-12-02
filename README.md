@@ -3,7 +3,7 @@
 
 <div align="center">
 
-![EmuVerse Logo](https://img.shields.io/badge/EmuVerse-Multi--Emulation%20Platform-06b6d4?style=for-the-badge&logo=gamepad&logoColor=white)
+![ROMulus Logo](https://img.shields.io/badge/ROMulus-Multi--Emulation%20Platform-06b6d4?style=for-the-badge&logo=gamepad&logoColor=white)
 
 **A self-hosted multi-emulation platform with remote play capabilities**
 
@@ -88,7 +88,7 @@ The installer will:
 ```bash
 # Clone the repository
 git clone https://github.com/XxishikuxX/ROMulus.git
-cd emuverse
+cd ROMulus
 
 # Copy environment template
 cp .env.example .env
@@ -130,7 +130,7 @@ sudo apt install -y build-essential git cmake
 ```bash
 # Clone repository
 git clone https://github.com/XxishikuxX/ROMulus.git
-cd emuverse
+cd ROMulus
 
 # Install backend dependencies
 cd backend
@@ -151,7 +151,7 @@ npm install
 
 ```bash
 # Backend .env
-DATABASE_URL="postgresql://user:password@localhost:5432/emuverse"
+DATABASE_URL="postgresql://user:password@localhost:5432/ROMulus"
 REDIS_URL="redis://localhost:6379"
 JWT_SECRET="your-secure-secret-key"
 PORT=3000
@@ -185,7 +185,7 @@ Create a `.env` file in the root directory:
 
 ```env
 # Database
-DATABASE_URL=postgresql://emuverse:password@localhost:5432/emuverse
+DATABASE_URL=postgresql://ROMulus:password@localhost:5432/ROMulus
 REDIS_URL=redis://localhost:6379
 
 # Authentication
@@ -198,7 +198,7 @@ NODE_ENV=production
 CORS_ORIGIN=http://localhost:5173
 
 # File Storage
-UPLOAD_DIR=/opt/emuverse/data
+UPLOAD_DIR=/opt/ROMulus/data
 MAX_ROM_SIZE=4GB
 
 # RetroAchievements (Optional)
@@ -212,7 +212,7 @@ STUN_SERVER=stun:stun.l.google.com:19302
 ### Directory Structure
 
 ```
-/opt/emuverse/
+/opt/ROMulus/
 ├── data/
 │   ├── roms/           # ROM files organized by system
 │   │   ├── nes/
@@ -238,14 +238,14 @@ STUN_SERVER=stun:stun.l.google.com:19302
 
 ### Accessing the Web Interface
 
-After installation, access EmuVerse at:
+After installation, access ROMulus at:
 - **Local**: `http://localhost:5173`
 - **Network**: `http://your-server-ip:5173`
 
 ### Default Admin Account
 
 ```
-Email: admin@emuverse.local
+Email: admin@ROMulus.local
 Password: admin123
 ```
 
@@ -254,7 +254,7 @@ Password: admin123
 ### Adding ROMs
 
 1. **Web Upload**: Go to Admin Panel → ROMs → Upload
-2. **Direct Copy**: Place ROMs in `/opt/emuverse/data/roms/{system}/`
+2. **Direct Copy**: Place ROMs in `/opt/ROMulus/data/roms/{system}/`
 3. **Bulk Import**: Use the admin CLI tool
 
 ```bash
@@ -278,7 +278,7 @@ See [docs/API_DOCS.md](docs/API_DOCS.md) for complete documentation.
 
 ```bash
 # Application logs
-tail -f /opt/emuverse/logs/app.log
+tail -f /opt/ROMulus/logs/app.log
 
 # Docker logs
 docker-compose logs -f
