@@ -1,3 +1,4 @@
+
 # 🎮 EmuVerse
 
 <div align="center">
@@ -67,8 +68,8 @@
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/emuverse.git
-cd emuverse
+git clone https://github.com/XxishikuxX/ROMulus.git
+cd ROMulus
 
 # Run the installer
 chmod +x scripts/install.sh
@@ -86,7 +87,7 @@ The installer will:
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/emuverse.git
+git clone https://github.com/XxishikuxX/ROMulus.git
 cd emuverse
 
 # Copy environment template
@@ -128,7 +129,7 @@ sudo apt install -y build-essential git cmake
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/emuverse.git
+git clone https://github.com/XxishikuxX/ROMulus.git
 cd emuverse
 
 # Install backend dependencies
