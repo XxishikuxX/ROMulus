@@ -1,0 +1,147 @@
+version: '3.8'
+
+services:
+  # ===========================================
+  # PostgreSQL Database
+  # ===========================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: romulus-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-romulus}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-romulus_secret}
+      POSTGRES_DB: ${DB_NAME:-romulus}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-romulus}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - romulus-network
+
+  # ===========================================
+  # Redis Cache
+  # ===========================================
+  redis:
+    image: redis:7-alpine
+    container_name: romulus-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - romulus-network
+
+  # ===========================================
+  # Backend API Server
+  # ===========================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: romulus-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://${DB_USER:-romulus}:${DB_PASSWORD:-romulus_secret}@postgres:5432/${DB_NAME:-romulus}
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-change-this-to-a-secure-secret}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost}
+      UPLOAD_DIR: /app/data
+      RA_API_KEY: ${RA_API_KEY:-}
+    volumes:
+      - romulus_data:/app/data
+      - romulus_logs:/app/logs
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - romulus-network
+
+  # ===========================================
+  # Frontend Web Server
+  # ===========================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-/api}
+    container_name: romulus-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - backend
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ssl_certs:/etc/nginx/ssl:ro
+    networks:
+      - romulus-network
+
+  # ===========================================
+  # Streaming Server (WebRTC)
+  # ===========================================
+  streaming:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.streaming
+    container_name: romulus-streaming
+    restart: unless-stopped
+    environment:
+      PORT: 8080
+      REDIS_URL: redis://redis:6379
+      STUN_SERVER: ${STUN_SERVER:-stun:stun.l.google.com:19302}
+    ports:
+      - "8080:8080"
+      - "10000-10100:10000-10100/udp"
+    depends_on:
+      - redis
+    networks:
+      - romulus-network
+
+# ===========================================
+# Networks
+# ===========================================
+networks:
+  romulus-network:
+    driver: bridge
+
+# ===========================================
+# Volumes
+# ===========================================
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  romulus_data:
+    driver: local
+  romulus_logs:
+    driver: local
+  ssl_certs:
+    driver: local
