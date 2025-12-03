@@ -1,0 +1,43 @@
+{
+  "name": "ROMulus",
+  "displayName": "ROMulus",
+  "expo": {
+    "name": "ROMulus",
+    "slug": "romulus-mobile",
+    "version": "2.3.0",
+    "orientation": "landscape",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#030305"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.romulus.mobile",
+      "buildNumber": "23"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#030305"
+      },
+      "package": "com.romulus.mobile",
+      "versionCode": 23,
+      "permissions": [
+        "android.permission.INTERNET",
+        "android.permission.VIBRATE",
+        "android.permission.WAKE_LOCK",
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_CONNECT"
+      ]
+    },
+    "plugins": [
+      "expo-router"
+    ]
+  }
+}
