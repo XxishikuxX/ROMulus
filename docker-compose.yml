@@ -1,0 +1,138 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: romulus-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: romulus
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-romulus_secret_password}
+      POSTGRES_DB: romulus
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U romulus -d romulus"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - romulus-network
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: romulus-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - romulus-network
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: romulus-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://romulus:${DB_PASSWORD:-romulus_secret_password}@postgres:5432/romulus
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-xK9pL2mN4qR7sT0vW3yZ6bD8fH1jM5nP9rS2uV4xY7zA0cE3gI6kO8qT1wX4zB7d}
+      JWT_EXPIRES_IN: 7d
+      DATA_DIR: /data
+      ROM_DIR: /data/roms
+      BIOS_DIR: /data/bios
+      SAVE_DIR: /data/saves
+      STATE_DIR: /data/states
+      COVER_DIR: /data/covers
+      SCREENSHOT_DIR: /data/screenshots
+      MAX_FILE_SIZE: 4294967296
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@romulus.local}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
+    volumes:
+      - roms_data:/data/roms
+      - bios_data:/data/bios
+      - saves_data:/data/saves
+      - states_data:/data/states
+      - covers_data:/data/covers
+      - screenshots_data:/data/screenshots
+      - cheats_data:/data/cheats
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - romulus-network
+
+  # Streaming Server
+  streaming:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.streaming
+    container_name: romulus-streaming
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 8080
+      REDIS_URL: redis://redis:6379
+    volumes:
+      - roms_data:/data/roms:ro
+      - bios_data:/data/bios:ro
+      - saves_data:/data/saves
+      - states_data:/data/states
+    depends_on:
+      - backend
+      - redis
+    networks:
+      - romulus-network
+
+  # Frontend (Nginx)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: romulus-frontend
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-80}:80"
+    volumes:
+      - covers_data:/data/covers:ro
+      - screenshots_data:/data/screenshots:ro
+    depends_on:
+      - backend
+      - streaming
+    networks:
+      - romulus-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  roms_data:
+  bios_data:
+  saves_data:
+  states_data:
+  covers_data:
+  screenshots_data:
+  cheats_data:
+
+networks:
+  romulus-network:
+    driver: bridge
